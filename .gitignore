@@ -1,0 +1,20 @@
+﻿__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.streamlit/secrets.toml
+.vscode/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+
+# Large generated output files
+outputs/*.csv
+
+# Development backups
+app_before_*.py
+maintenance_recommendation_backup.py
+*_block.txt
+dashboard_sections.txt
+README_before_final.md
