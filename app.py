@@ -72,12 +72,18 @@ def load_csv(filename):
 
     file_path = OUTPUT_DIR / filename
 
-    if not file_path.exists():
+    try:
+        if file_path.exists():
+            return pd.read_csv(file_path)
+
+        zip_path = OUTPUT_DIR / (Path(filename).stem + ".zip")
+        if zip_path.exists():
+            return pd.read_csv(zip_path, compression="zip")
+
         return None
 
-    try:
-        return pd.read_csv(file_path)
-    except Exception:
+    except Exception as exc:
+        st.warning(f"Could not load {filename}: {exc}")
         return None
 
 
