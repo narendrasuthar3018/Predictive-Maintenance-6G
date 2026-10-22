@@ -12812,26 +12812,37 @@ system_health_dataset_path = (
 )
 
 system_health_required_outputs = {
-    "Engineered Dataset":
-        "engineered_dataset.csv",
+    "Engineered Dataset": [
+        "engineered_dataset.csv"
+    ],
 
-    "Anomaly Detection":
-        "anomaly_detection_results.csv",
+    "Anomaly Detection": [
+        "anomaly_detection_results.csv"
+    ],
 
-    "Risk Engine":
+    "Risk Engine": [
         "risk_engine_results.csv",
+        "risk_engine_results.zip"
+    ],
 
-    "Maintenance Recommendations":
+    "Maintenance Recommendations": [
         "maintenance_recommendation_results.csv",
+        "maintenance_recommendation_results.zip"
+    ],
 
-    "Machine Maintenance Summary":
-        "machine_maintenance_summary.csv",
+    "Machine Maintenance Summary": [
+        "machine_maintenance_summary.csv"
+    ],
 
-    "Maintenance Priority Queue":
+    "Maintenance Priority Queue": [
         "maintenance_priority_queue.csv",
+        "maintenance_priority_queue.zip"
+    ],
 
-    "Fleet Maintenance Summary":
-        "fleet_maintenance_summary.csv"
+    "Fleet Maintenance Summary": [
+        "fleet_maintenance_summary.csv",
+        "fleet_maintenance_summary.zip"
+    ]
 }
 
 # ------------------------------------------------------------
@@ -12999,16 +13010,25 @@ if not system_health_active_df.empty:
 
 system_health_engine_rows = []
 
-for engine_name, output_filename in (
+for engine_name, output_filenames in (
     system_health_required_outputs.items()
 ):
 
-    output_path = (
-        system_health_output_dir
-        / output_filename
-    )
+    existing_output_path = None
 
-    exists = output_path.exists()
+    for output_filename in output_filenames:
+
+        candidate_path = (
+            system_health_output_dir
+            / output_filename
+        )
+
+        if candidate_path.is_file():
+
+            existing_output_path = candidate_path
+            break
+
+    exists = existing_output_path is not None
 
     size_mb = 0.0
 
@@ -13017,23 +13037,30 @@ for engine_name, output_filename in (
         try:
 
             size_mb = (
-                output_path.stat().st_size
+                existing_output_path.stat().st_size
                 / (1024 * 1024)
             )
 
-        except Exception:
+        except OSError:
 
             size_mb = 0.0
 
     system_health_engine_rows.append(
         {
             "Engine": engine_name,
-            "Output File": output_filename,
+
+            "Output File": (
+                existing_output_path.name
+                if exists
+                else " / ".join(output_filenames)
+            ),
+
             "Status": (
                 "READY"
                 if exists
                 else "MISSING"
             ),
+
             "Size (MB)": round(
                 size_mb,
                 2
@@ -13047,9 +13074,7 @@ system_health_engine_df = pd.DataFrame(
 
 system_health_ready_engines = int(
     (
-        system_health_engine_df[
-            "Status"
-        ]
+        system_health_engine_df["Status"]
         == "READY"
     ).sum()
 )
@@ -13373,6 +13398,12 @@ if not system_health_engine_df.empty:
 
 st.markdown("### Pipeline Stage Monitor")
 
+def pipeline_output_exists(*filenames):
+    return any(
+        (system_health_output_dir / filename).is_file()
+        for filename in filenames
+    )
+
 pipeline_stage_data = pd.DataFrame(
     {
         "Stage": [
@@ -13391,34 +13422,32 @@ pipeline_stage_data = pd.DataFrame(
             ),
             (
                 "READY"
-                if (
-                    system_health_output_dir
-                    / "engineered_dataset.csv"
-                ).exists()
+                if pipeline_output_exists(
+                    "engineered_dataset.csv"
+                )
                 else "MISSING"
             ),
             (
                 "READY"
-                if (
-                    system_health_output_dir
-                    / "anomaly_detection_results.csv"
-                ).exists()
+                if pipeline_output_exists(
+                    "anomaly_detection_results.csv"
+                )
                 else "MISSING"
             ),
             (
                 "READY"
-                if (
-                    system_health_output_dir
-                    / "risk_engine_results.csv"
-                ).exists()
+                if pipeline_output_exists(
+                    "risk_engine_results.csv",
+                    "risk_engine_results.zip"
+                )
                 else "MISSING"
             ),
             (
                 "READY"
-                if (
-                    system_health_output_dir
-                    / "maintenance_recommendation_results.csv"
-                ).exists()
+                if pipeline_output_exists(
+                    "maintenance_recommendation_results.csv",
+                    "maintenance_recommendation_results.zip"
+                )
                 else "MISSING"
             ),
             "READY"
@@ -13431,7 +13460,6 @@ st.dataframe(
     width="stretch",
     hide_index=True
 )
-
 # ------------------------------------------------------------
 # SYSTEM HEALTH SCORE
 # ------------------------------------------------------------
