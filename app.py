@@ -144,18 +144,16 @@ if maintenance_df is None:
     st.stop()
 # ============================================================
 # DASHBOARD DATA COMPATIBILITY LAYER
-# ============================================================
-# The maintenance engine uses production-oriented column names.
-# The dashboard internally uses shorter analytical aliases.
-# Create aliases once here so downstream sections remain compatible.
+# Create dashboard aliases together to reduce DataFrame fragmentation.
 
 if maintenance_df is not None and not maintenance_df.empty:
+    aliases = {}
 
     if (
         "risk_score" not in maintenance_df.columns
         and "maintenance_risk_score" in maintenance_df.columns
     ):
-        maintenance_df["risk_score"] = pd.to_numeric(
+        aliases["risk_score"] = pd.to_numeric(
             maintenance_df["maintenance_risk_score"],
             errors="coerce"
         )
@@ -164,7 +162,7 @@ if maintenance_df is not None and not maintenance_df.empty:
         "risk_level" not in maintenance_df.columns
         and "maintenance_risk_category" in maintenance_df.columns
     ):
-        maintenance_df["risk_level"] = (
+        aliases["risk_level"] = (
             maintenance_df["maintenance_risk_category"]
             .astype(str)
             .str.strip()
@@ -174,15 +172,19 @@ if maintenance_df is not None and not maintenance_df.empty:
         "root_cause" not in maintenance_df.columns
         and "dominant_risk_factor" in maintenance_df.columns
     ):
-        maintenance_df["root_cause"] = (
+        aliases["root_cause"] = (
             maintenance_df["dominant_risk_factor"]
             .astype(str)
             .str.strip()
         )
 
+    if aliases:
+        maintenance_df = pd.concat(
+            [maintenance_df, pd.DataFrame(aliases, index=maintenance_df.index)],
+            axis=1
+        ).copy()
 
 
-# ============================================================
 # BASIC SYSTEM INFORMATION
 # ============================================================
 
