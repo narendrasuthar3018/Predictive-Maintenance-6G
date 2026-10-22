@@ -1,0 +1,2 @@
+total_records,total_machines,average_maintenance_risk,maximum_maintenance_risk,average_machine_health,anomaly_records,anomaly_rate_pct,critical_records,high_records,P1_emergency_records,P2_high_records,P3_planned_records,P4_routine_records,estimated_total_downtime_hours,estimated_total_maintenance_cost,estimated_total_production_impact_units,dominant_risk_factor,fleet_status
+100000,50,46.22,84.16,53.78,5000,5.0,70,30542,70,30545,69381,4,136474.41,759340410.0,37449444.67,Network / 6G,Immediate Maintenance Attention
