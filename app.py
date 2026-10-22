@@ -78,19 +78,16 @@ def load_csv(filename):
             st.error(f"Error loading {filename}: {type(exc).__name__}: {exc}")
             return None
 
-    # Use compressed maintenance results when the full CSV is unavailable.
-    if filename == "maintenance_recommendation_results.csv":
-        zip_path = OUTPUT_DIR / "maintenance_recommendation_results.zip"
+    zip_path = OUTPUT_DIR / (Path(filename).stem + ".zip")
 
-        if zip_path.exists():
-            try:
-                with zip_path.open("rb") as zip_file:
-                    return pd.read_csv(zip_file, compression="zip")
-            except Exception as exc:
-                st.error(f"Error loading maintenance ZIP: {type(exc).__name__}: {exc}")
-                return None
+    if zip_path.exists():
+        try:
+            return pd.read_csv(zip_path, compression="zip")
+        except Exception as exc:
+            st.error(f"Error loading ZIP for {filename}: {type(exc).__name__}: {exc}")
+            return None
 
-    st.warning(f"CSV file not found: {filename}")
+    st.warning(f"CSV or ZIP file not found: {filename}")
     return None
 
 maintenance_df = load_csv(
@@ -15917,6 +15914,7 @@ st.caption(
     f"{APP_NAME} | Version {APP_VERSION} | "
     f"Developed by {APP_AUTHOR}"
 )
+
 
 
 
