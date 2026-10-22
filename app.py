@@ -69,23 +69,17 @@ st.markdown(
 
 @st.cache_data
 def load_csv(filename):
-
     file_path = OUTPUT_DIR / filename
 
+    if not file_path.exists():
+        st.warning(f"CSV file not found: {filename}")
+        return None
+
     try:
-        if file_path.exists():
-            return pd.read_csv(file_path)
-
-        zip_path = OUTPUT_DIR / (Path(filename).stem + ".zip")
-        if zip_path.exists():
-            return pd.read_csv(zip_path, compression="zip")
-
-        return None
-
+        return pd.read_csv(file_path)
     except Exception as exc:
-        st.warning(f"Could not load {filename}: {exc}")
+        st.error(f"Error loading {filename}: {type(exc).__name__}: {exc}")
         return None
-
 
 maintenance_df = load_csv(
     "maintenance_recommendation_results.csv"
@@ -12552,9 +12546,7 @@ if (
     and not active_analysis_df.empty
 ):
 
-    filtered_export_df = (
-        active_analysis_df.copy()
-    )
+    filtered_export_df = active_analysis_df
 
     st.success(
         f"Current filtered analysis contains "
@@ -15913,5 +15905,7 @@ st.caption(
     f"{APP_NAME} | Version {APP_VERSION} | "
     f"Developed by {APP_AUTHOR}"
 )
+
+
 
 
