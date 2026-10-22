@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import io
 import plotly.express as px
@@ -5785,7 +5785,8 @@ if (
     and not maintenance_df.empty
 ):
 
-    projection_df = maintenance_df.copy()
+    projection_columns = [col for col in ["Date", "risk_score"] if col in maintenance_df.columns]
+    projection_df = maintenance_df.loc[:, projection_columns].copy()
 
     # --------------------------------------------------------
     # DATE PREPARATION
@@ -12396,11 +12397,7 @@ with csv_col1:
 
         st.download_button(
             label="Download Detailed Maintenance CSV",
-            data=dataframe_to_csv_bytes(
-                prepare_export_dataframe(
-                    export_maintenance_df
-                )
-            ),
+            data=lambda df=export_maintenance_df: dataframe_to_csv_bytes(prepare_export_dataframe(df)),
             file_name=(
                 "maintenance_recommendation_results.csv"
             ),
@@ -12420,11 +12417,7 @@ with csv_col2:
 
         st.download_button(
             label="Download Machine Summary CSV",
-            data=dataframe_to_csv_bytes(
-                prepare_export_dataframe(
-                    export_machine_df
-                )
-            ),
+            data=lambda df=export_machine_df: dataframe_to_csv_bytes(prepare_export_dataframe(df)),
             file_name=(
                 "machine_maintenance_summary.csv"
             ),
@@ -12447,11 +12440,7 @@ with csv_col3:
 
         st.download_button(
             label="Download Priority Queue CSV",
-            data=dataframe_to_csv_bytes(
-                prepare_export_dataframe(
-                    export_priority_df
-                )
-            ),
+            data=lambda df=export_priority_df: dataframe_to_csv_bytes(prepare_export_dataframe(df)),
             file_name=(
                 "maintenance_priority_queue.csv"
             ),
@@ -12471,11 +12460,7 @@ with csv_col4:
 
         st.download_button(
             label="Download Fleet Summary CSV",
-            data=dataframe_to_csv_bytes(
-                prepare_export_dataframe(
-                    export_fleet_df
-                )
-            ),
+            data=lambda df=export_fleet_df: dataframe_to_csv_bytes(prepare_export_dataframe(df)),
             file_name=(
                 "fleet_maintenance_summary.csv"
             ),
@@ -12510,24 +12495,25 @@ excel_priority_export_df = (
     else export_priority_df.head(5000).copy()
 )
 
-excel_report = dataframe_to_excel_bytes(
-    [
-        export_machine_df,
-        excel_priority_export_df,
-        export_fleet_df
-    ],
-    [
-        "Machine Summary",
-        "Priority Queue Top 5000",
-        "Fleet Summary"
-    ]
-)
+def make_excel_report():
+    return dataframe_to_excel_bytes(
+        [
+            export_machine_df,
+            excel_priority_export_df,
+            export_fleet_df
+        ],
+        [
+            "Machine Summary",
+            "Priority Queue Top 5000",
+            "Fleet Summary"
+        ]
+    )
 
-if excel_report:
+if not (export_machine_df.empty and excel_priority_export_df.empty and export_fleet_df.empty):
 
     st.download_button(
         label="Download Complete Excel Report",
-        data=excel_report,
+        data=make_excel_report,
         file_name=(
             "predictive_maintenance_management_report.xlsx"
         ),
@@ -12566,11 +12552,7 @@ if (
 
     st.download_button(
         label="Download Current Filtered Analysis CSV",
-        data=dataframe_to_csv_bytes(
-            prepare_export_dataframe(
-                filtered_export_df
-            )
-        ),
+        data=lambda df=filtered_export_df: dataframe_to_csv_bytes(prepare_export_dataframe(df)),
         file_name=(
             "filtered_predictive_maintenance_analysis.csv"
         ),
@@ -12722,22 +12704,24 @@ if not executive_report_df.empty:
         hide_index=True
     )
 
-    executive_excel = dataframe_to_excel_bytes(
-        [
-            executive_report_df,
-            export_machine_df,
-            export_priority_df
-        ],
-        [
-            "Executive Summary",
-            "Machine Summary",
-            "Priority Queue"
-        ]
-    )
+    def make_executive_excel_report():
+        return dataframe_to_excel_bytes(
+            [
+                executive_report_df,
+                export_machine_df,
+                export_priority_df
+            ],
+            [
+                "Executive Summary",
+                "Machine Summary",
+                "Priority Queue"
+            ]
+        )
 
     st.download_button(
         label="Download Executive Excel Report",
-        data=executive_excel,
+        data=make_executive_excel_report,
+
         file_name=(
             "executive_maintenance_report.xlsx"
         ),
@@ -14423,98 +14407,106 @@ if not sixg_df.empty:
 
     st.subheader("ðŸ”” Communication Alert Center")
 
-    network_alerts = []
+    # Vectorized NETWORK ALERT CENTER processing.
+    # Avoid iterating through all 100,000 rows individually.
 
-    for _, row in sixg_df.iterrows():
+    network_risk_values = pd.to_numeric(
+        sixg_df.get(
+            "network_risk",
+            pd.Series(0, index=sixg_df.index)
+        ),
+        errors="coerce"
+    )
 
-        try:
+    latency_values = pd.to_numeric(
+        sixg_df.get(
+            "Network_Latency_ms",
+            pd.Series(0, index=sixg_df.index)
+        ),
+        errors="coerce"
+    )
 
-            machine = row.get(
-                "Machine_ID",
-                "Unknown"
-            )
+    packet_loss_values = pd.to_numeric(
+        sixg_df.get(
+            "Packet_Loss_%",
+            pd.Series(0, index=sixg_df.index)
+        ),
+        errors="coerce"
+    )
 
-            latency = float(
-                row.get(
-                    "Network_Latency_ms",
-                    0
-                )
-            )
+    machine_values = sixg_df.get(
+        "Machine_ID",
+        pd.Series("Unknown", index=sixg_df.index)
+    )
 
-            packet_loss = float(
-                row.get(
-                    "Packet_Loss_%",
-                    0
-                )
-            )
+    severe_mask = network_risk_values >= 75
+    high_mask = (network_risk_values >= 60) & ~severe_mask
 
-            network_risk = float(
-                row.get(
-                    "network_risk",
-                    0
-                )
-            )
+    latency_mask = (
+        ~(network_risk_values >= 60)
+        & (latency_values >= latency_95)
+    )
 
-            if network_risk >= 75:
+    packet_mask = (
+        ~(network_risk_values >= 60)
+        & ~(latency_values >= latency_95)
+        & (packet_loss_values >= packet_95)
+    )
 
-                network_alerts.append({
-                    "Machine_ID": machine,
-                    "Alert": "Severe Network Risk",
-                    "Severity": "Critical",
-                    "Network Risk": network_risk,
-                    "Latency (ms)": latency,
-                    "Packet Loss (%)": packet_loss,
-                    "Recommended Response":
-                        "Immediate communication diagnostics"
-                })
+    alert_mask = (
+        severe_mask | high_mask | latency_mask | packet_mask
+    )
 
-            elif network_risk >= 60:
+    network_alert_df = pd.DataFrame({
+        "Machine_ID": machine_values.loc[alert_mask],
+        "Alert": np.select(
+            [
+                severe_mask.loc[alert_mask],
+                high_mask.loc[alert_mask],
+                latency_mask.loc[alert_mask],
+                packet_mask.loc[alert_mask]
+            ],
+            [
+                "Severe Network Risk",
+                "Elevated Network Risk",
+                "High Communication Latency",
+                "Elevated Packet Loss"
+            ],
+            default=""
+        ),
+        "Severity": np.select(
+            [
+                severe_mask.loc[alert_mask],
+                high_mask.loc[alert_mask],
+                latency_mask.loc[alert_mask],
+                packet_mask.loc[alert_mask]
+            ],
+            ["Critical", "High", "Medium", "Medium"],
+            default=""
+        ),
+        "Network Risk": network_risk_values.loc[alert_mask],
+        "Latency (ms)": latency_values.loc[alert_mask],
+        "Packet Loss (%)": packet_loss_values.loc[alert_mask],
+        "Recommended Response": np.select(
+            [
+                severe_mask.loc[alert_mask],
+                high_mask.loc[alert_mask],
+                latency_mask.loc[alert_mask],
+                packet_mask.loc[alert_mask]
+            ],
+            [
+                "Immediate communication diagnostics",
+                "Inspect communication performance",
+                "Review network congestion",
+                "Inspect communication reliability"
+            ],
+            default=""
+        )
+    })
 
-                network_alerts.append({
-                    "Machine_ID": machine,
-                    "Alert": "Elevated Network Risk",
-                    "Severity": "High",
-                    "Network Risk": network_risk,
-                    "Latency (ms)": latency,
-                    "Packet Loss (%)": packet_loss,
-                    "Recommended Response":
-                        "Inspect communication performance"
-                })
+    if not network_alert_df.empty:
 
-            elif latency >= latency_95:
-
-                network_alerts.append({
-                    "Machine_ID": machine,
-                    "Alert": "High Communication Latency",
-                    "Severity": "Medium",
-                    "Network Risk": network_risk,
-                    "Latency (ms)": latency,
-                    "Packet Loss (%)": packet_loss,
-                    "Recommended Response":
-                        "Review network congestion"
-                })
-
-            elif packet_loss >= packet_95:
-
-                network_alerts.append({
-                    "Machine_ID": machine,
-                    "Alert": "Elevated Packet Loss",
-                    "Severity": "Medium",
-                    "Network Risk": network_risk,
-                    "Latency (ms)": latency,
-                    "Packet Loss (%)": packet_loss,
-                    "Recommended Response":
-                        "Inspect communication reliability"
-                })
-
-        except Exception:
-            continue
-
-    if network_alerts:
-
-        network_alert_df = pd.DataFrame(
-            network_alerts
-        ).sort_values(
+        network_alert_df = network_alert_df.sort_values(
             "Network Risk",
             ascending=False
         )
@@ -14523,18 +14515,6 @@ if not sixg_df.empty:
             network_alert_df.head(100),
             width="stretch",
             hide_index=True
-        )
-
-        st.caption(
-            f"Showing top {min(100, len(network_alert_df))} "
-            f"communication alerts."
-        )
-
-    else:
-
-        st.success(
-            "No significant communication alerts detected "
-            "under the current network-risk thresholds."
         )
 
     # --------------------------------------------------------
