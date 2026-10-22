@@ -179,10 +179,7 @@ if maintenance_df is not None and not maintenance_df.empty:
         )
 
     if aliases:
-        maintenance_df = pd.concat(
-            [maintenance_df, pd.DataFrame(aliases, index=maintenance_df.index)],
-            axis=1
-        ).copy()
+        maintenance_df = pd.concat([maintenance_df, pd.DataFrame(aliases, index=maintenance_df.index)], axis=1)
 
 
 # BASIC SYSTEM INFORMATION
