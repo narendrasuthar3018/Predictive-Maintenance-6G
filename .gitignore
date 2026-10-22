@@ -18,3 +18,13 @@ maintenance_recommendation_backup.py
 *_block.txt
 dashboard_sections.txt
 README_before_final.md
+
+# Temporary patch and maintenance scripts
+apply_excel_priority_patch.py
+fix_compatibility.py
+update_loader.ps1
+loader_temp.txt
+requirements_before_pyarrow_fix.txt
+
+# Generated backup archives
+outputs/*_full_backup.zip

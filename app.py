@@ -67,29 +67,28 @@ st.markdown(
 # DATA LOADING
 # ============================================================
 
-@st.cache_data
+@st.cache_data(max_entries=2)
 def load_csv(filename):
     file_path = OUTPUT_DIR / filename
-
-    if file_path.exists():
-        try:
-            return pd.read_csv(file_path)
-        except Exception as exc:
-            st.error(f"Error loading {filename}: {type(exc).__name__}: {exc}")
-            return None
-
     zip_path = OUTPUT_DIR / (Path(filename).stem + ".zip")
 
-    if zip_path.exists():
-        try:
-            return pd.read_csv(zip_path, compression="zip")
-        except Exception as exc:
-            st.error(f"Error loading ZIP for {filename}: {type(exc).__name__}: {exc}")
-            return None
+    # Prefer ZIP when available.
+    source_path = zip_path if zip_path.exists() else file_path
 
-    st.warning(f"CSV or ZIP file not found: {filename}")
-    return None
+    if not source_path.exists():
+        st.warning(f"CSV or ZIP file not found: {filename}")
+        return None
 
+    try:
+        if source_path.suffix.lower() == ".zip":
+            return pd.read_csv(source_path, compression="zip")
+        return pd.read_csv(source_path)
+    except Exception as exc:
+        st.error(
+            f"Error loading {source_path.name}: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        return None
 maintenance_df = load_csv(
     "maintenance_recommendation_results.csv"
 )
@@ -98,9 +97,8 @@ machine_df = load_csv(
     "machine_maintenance_summary.csv"
 )
 
-priority_df = load_csv(
-    "maintenance_priority_queue.csv"
-)
+# Priority queue loading will be handled on demand in the export section.
+priority_df = None
 
 fleet_df = load_csv(
     "fleet_maintenance_summary.csv"
@@ -290,11 +288,14 @@ with status_col2:
         st.warning("âš ï¸ Machine Analytics")
 
 with status_col3:
-    if priority_df is not None:
-        st.success("âœ… Priority Queue")
-    else:
-        st.warning("âš ï¸ Priority Queue")
+    priority_zip_available = (
+        OUTPUT_DIR / "maintenance_priority_queue.zip"
+    ).exists()
 
+    if priority_zip_available:
+        st.success("Priority Queue ZIP Available")
+    else:
+        st.warning("Priority Queue ZIP Unavailable")
 with status_col4:
     if fleet_df is not None:
         st.success("âœ… Fleet Analytics")
@@ -12335,6 +12336,28 @@ def dataframe_to_excel_bytes(
 
 
 # ------------------------------------------------------------
+def load_priority_queue_for_excel(limit=5000):
+    """Load priority queue records only when an Excel report is requested."""
+    zip_path = OUTPUT_DIR / "maintenance_priority_queue.zip"
+
+    if not zip_path.exists():
+        st.warning("Priority Queue ZIP file is unavailable.")
+        return pd.DataFrame()
+
+    try:
+        return pd.read_csv(
+            zip_path,
+            compression="zip",
+            nrows=limit
+        )
+    except Exception as exc:
+        st.error(
+            f"Unable to load Priority Queue for Excel: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        return pd.DataFrame()
+
+
 # EXPORT SUMMARY
 # ------------------------------------------------------------
 
@@ -12433,24 +12456,26 @@ csv_col3, csv_col4 = st.columns(2)
 
 with csv_col3:
 
-    if not export_priority_df.empty:
+    priority_zip_path = OUTPUT_DIR / "maintenance_priority_queue.zip"
+
+    if priority_zip_path.exists():
+
+        def get_priority_queue_zip_bytes():
+            return priority_zip_path.read_bytes()
 
         st.download_button(
-            label="Download Priority Queue CSV",
-            data=lambda df=export_priority_df: dataframe_to_csv_bytes(prepare_export_dataframe(df)),
-            file_name=(
-                "maintenance_priority_queue.csv"
-            ),
-            mime="text/csv",
-            key="download_priority_queue_csv"
+            label="Download Priority Queue ZIP",
+            data=get_priority_queue_zip_bytes,
+            file_name="maintenance_priority_queue.zip",
+            mime="application/zip",
+            key="download_priority_queue_zip"
         )
 
     else:
 
         st.info(
-            "Maintenance priority queue is unavailable."
+            "Priority Queue ZIP file is unavailable."
         )
-
 with csv_col4:
 
     if not export_fleet_df.empty:
@@ -12493,10 +12518,12 @@ excel_priority_export_df = (
 )
 
 def make_excel_report():
+    priority_excel_df = load_priority_queue_for_excel(limit=5000)
+
     return dataframe_to_excel_bytes(
         [
             export_machine_df,
-            excel_priority_export_df,
+            priority_excel_df,
             export_fleet_df
         ],
         [
@@ -12702,16 +12729,18 @@ if not executive_report_df.empty:
     )
 
     def make_executive_excel_report():
+        priority_excel_df = load_priority_queue_for_excel(limit=5000)
+
         return dataframe_to_excel_bytes(
             [
                 executive_report_df,
                 export_machine_df,
-                export_priority_df
+                priority_excel_df
             ],
             [
                 "Executive Summary",
                 "Machine Summary",
-                "Priority Queue"
+                "Priority Queue Top 5000"
             ]
         )
 
